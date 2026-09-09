@@ -8,11 +8,12 @@
 #define KEY2_PORT               GPIOB
 #define KEY2_PIN                GPIO_Pin_11
 
-/* 按键时基: TIM4 更新中断, 每 1ms 触发一次
-   (中断服务函数 TIM4_IRQHandler 在 main.c 中实现, 内部调用 Key_Tick()) */
-#define KEY_TIM                 TIM4
-#define KEY_TIM_RCC             RCC_APB1Periph_TIM4
-#define KEY_TIM_IRQn            TIM4_IRQn
+/* 按键时基: TIM2 更新中断, 每 1ms 触发一次
+   (配置写法与工程内已验证的参考代码一致: PSC 720-1 / ARR 100-1, 72MHz 下为 1ms)
+   (中断服务函数 TIM2_IRQHandler 在 main.c 中实现, 内部调用 Key_Tick()) */
+#define KEY_TIM                 TIM2
+#define KEY_TIM_RCC             RCC_APB1Periph_TIM2
+#define KEY_TIM_IRQn            TIM2_IRQn
 
 /* ============================== 时序参数(单位 ms) ============================== */
 #define KEY_DEBOUNCE_MS         10      /* 消抖时间: 电平需连续稳定 10ms 才确认翻转 */
@@ -169,7 +170,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 
 /**
   * @brief  1ms 节拍扫描(两个按键)
-  * @note   需由 TIM4 更新中断服务函数(TIM4_IRQHandler, 见 main.c)
+  * @note   需由 TIM2 更新中断服务函数(TIM2_IRQHandler, 见 main.c)
   *         每 1ms 调用一次; 若自行更换时基, 请保证按 1ms 周期调用本函数
   * @retval 无
   */
@@ -182,7 +183,7 @@ void Key_Tick(void)
 /**
   * @brief  按键 GPIO 与 TIM4 1ms 时基初始化(按键为非阻塞方式扫描)
   * @note   Key1 = PB1, Key2 = PB11, 下拉输入;
-  *         TIM4 每 1ms 产生更新中断, 中断服务函数 TIM4_IRQHandler
+  *         TIM2 每 1ms 产生更新中断, 中断服务函数 TIM2_IRQHandler
   *         需在 main.c 中实现并每 1ms 调用一次 Key_Tick()
   * @retval 无
   */
@@ -219,23 +220,27 @@ void Key_Init(void)
 	}
 	Key_Clear();
 
-	/* 4. TIM4 配置: 1ms 更新中断
-	       注意: APB1 分频不为 1 时定时器时钟 = 2 x APB1 = SystemCoreClock(默认72MHz),
-	       预分频到 1MHz 计数, 自动重装 1000 即为 1ms; 若系统时钟不是 72MHz,
-	       SystemCoreClock 会自动换算预分频系数 */
-	TIM_TimeBaseStructure.TIM_Period = 1000 - 1;        /* 计数 1000 次 */
-	TIM_TimeBaseStructure.TIM_Prescaler =
-		(uint16_t)(SystemCoreClock / 1000000U - 1U);    /* 计数频率 1MHz */
+	/* 4. TIM2 配置: 1ms 更新中断
+	       参考工程已验证写法: 预分频 720(计数100kHz) + 周期100(ARR=99) => 1ms
+	       (前提: 系统时钟 72MHz, 与本工程 Delay 模块一致) */
+	TIM_TimeBaseStructure.TIM_Period = 100 - 1;        /* ARR = 99 */
+	TIM_TimeBaseStructure.TIM_Prescaler = 720 - 1;     /* PSC = 719 */
 	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseInit(KEY_TIM, &TIM_TimeBaseStructure);
 
-	/* 5. 使能 TIM4 更新中断并启动 */
+	/* 5. 清除时基初始化产生的更新事件标志(否则使能中断后会立刻多进一次中断) */
+	TIM_ClearFlag(KEY_TIM, TIM_FLAG_Update);
+
+	/* 6. 使能 TIM2 更新中断并启动 */
 	TIM_ITConfig(KEY_TIM, TIM_IT_Update, ENABLE);
 
+	/* NVIC 中断分组(整个工程只需配置一次, 分组2: 抢占0~3 / 响应0~3) */
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+
 	NVIC_InitStructure.NVIC_IRQChannel = KEY_TIM_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);
 
@@ -252,3 +257,9 @@ void Key_Clear(void)
 	KeyAction1 = Waiting;
 	KeyAction2 = Waiting;
 }
+
+/* ==================== 临时诊断接口(定位"单击不显示"问题用, 定位后删除) ==================== */
+uint8_t  Key_DbgLevel(uint8_t Idx)   { return KeyDev[Idx].Level; }      /* 去抖后电平 */
+uint8_t  Key_DbgPhase(uint8_t Idx)   { return KeyDev[Idx].Phase; }      /* 内部阶段 */
+uint16_t Key_DbgWaitMs(uint8_t Idx)  { return KeyDev[Idx].WaitMs; }     /* 双击窗口倒计时 */
+uint16_t Key_DbgPressMs(uint8_t Idx) { return KeyDev[Idx].PressMs; }    /* 按住计时 */
