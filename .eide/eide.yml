@@ -71,6 +71,12 @@ virtualFolder:
         - path: System/Delay.c
         - path: System/Delay.h
       folders: []
+    - name: HardWare
+      files:
+        - path: HardWare/OLED.c
+        - path: HardWare/OLED.h
+        - path: HardWare/OLED_Font.h
+      folders: []
     - name: User
       files:
         - path: User/main.c
@@ -89,12 +95,14 @@ targets:
     cppPreprocessAttrs:
       defineList:
         - USE_STDPERIPH_DRIVER
+        - STM32F10X_MD
       incList:
         - .
         - Start
         - User
         - Labrary
         - System
+        - HardWare
         - .cmsis/include
         - RTE/_Target 1
       libList: []
