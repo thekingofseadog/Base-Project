@@ -6,8 +6,8 @@
 KeyAction_e LastAction1 = Waiting;
 KeyAction_e LastAction2 = Waiting;
 
-/* 动作值对应的名称(与枚举一一对应, 不足6字符补空格以便整行覆盖刷新) */
-static const char *ActionName[4] = {"Wait  ", "One   ", "Two   ", "Long  "};
+/* 动作值对应的名称(与枚举一一对应, 不足5字符补空格以便整行覆盖刷新) */
+static const char *ActionName[4] = {"Wait ", "One  ", "Two  ", "Long "};
 
 /**
   * @brief  刷新 OLED: 第1行显示 KeyAction1 的值, 第2行显示 KeyAction2 的值
@@ -20,19 +20,19 @@ static const char *ActionName[4] = {"Wait  ", "One   ", "Two   ", "Long  "};
   */
 static void OLED_ShowActions(KeyAction_e Act1, KeyAction_e Act2)
 {
-	/* 第1行: KeyAction1 的值 */
-	OLED_ShowString(1, 0, "KeyAct1: ");                 // 占 0~8 列
-	OLED_ShowChar(1, 9, (char)('0' + Act1));            // 值 0~3
-	OLED_ShowString(1, 10, (char *)ActionName[Act1]);   // 名称
+	/* 第1行: KeyAction1 的值(整体右移一列) */
+	OLED_ShowString(1, 1, "KeyAct1: ");                 // 占 1~9 列
+	OLED_ShowChar(1, 10, (char)('0' + Act1));           // 值 0~3
+	OLED_ShowString(1, 11, (char *)ActionName[Act1]);   // 名称 11~15 列
 
 	/* 第2行: KeyAction2 的值 */
-	OLED_ShowString(2, 0, "KeyAct2: ");
-	OLED_ShowChar(2, 9, (char)('0' + Act2));
-	OLED_ShowString(2, 10, (char *)ActionName[Act2]);
+	OLED_ShowString(2, 1, "KeyAct2: ");
+	OLED_ShowChar(2, 10, (char)('0' + Act2));
+	OLED_ShowString(2, 11, (char *)ActionName[Act2]);
 
 	/* 第3/4行: 图例 */
-	OLED_ShowString(3, 0, "0:Wait 1:One");
-	OLED_ShowString(4, 0, "2:Two  3:Long");
+	OLED_ShowString(3, 1, "0:Wait 1:One");
+	OLED_ShowString(4, 1, "2:Two  3:Long");
 }
 
 /**
