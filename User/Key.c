@@ -16,7 +16,7 @@
 
 /* ============================== 时序参数(单位 ms) ============================== */
 #define KEY_DEBOUNCE_MS         10      /* 消抖时间: 电平需连续稳定 10ms 才确认翻转 */
-#define KEY_DOUBLE_WIN_MS       200     /* 双击判定窗口: 短按松开后 200ms 内再按下为双击 */
+#define KEY_DOUBLE_WIN_MS       200     /* 双击补报窗口: 松开已报单击, 200ms 内再按下则补报双击 */
 #define KEY_LONG_MS             600     /* 长按阈值: 按下持续 600ms 上报一次长按 */
 
 /* ============================== 内部电平/阶段定义 ============================== */
@@ -27,8 +27,8 @@ enum
 {
 	P_IDLE = 0,     /* 空闲, 等待按下 */
 	P_PRESS,        /* 按下中(计时判定长按) */
-	P_WAIT2,        /* 短按松开, 等待窗口内的第二次按下(超时则判为单击) */
-	P_2NDPRESS      /* 双击已确认, 等待第二次按下松开 */
+	P_WAIT2,        /* 单击已上报, 等待窗口内的第二次按下以补报双击 */
+	P_2NDPRESS      /* 双击已补报, 等待第二次按下松开 */
 };
 
 /* 单个按键的内部状态 */
@@ -103,7 +103,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					Dev->LongDone = 0;
 					break;
 
-				case P_WAIT2:           /* 双击窗口内第二次按下: 上报双击 */
+				case P_WAIT2:           /* 双击窗口内第二次按下: 补报双击 */
 					Key_Report(Action, TwoButton);
 					Dev->Phase = P_2NDPRESS;
 					break;
@@ -121,8 +121,9 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					{
 						Dev->Phase = P_IDLE;
 					}
-					else                /* 短按松开: 进入双击等待窗口 */
+					else                /* 短按松开: 立即上报单击, 同时进入双击补报窗口 */
 					{
+						Key_Report(Action, OneButton);
 						Dev->WaitMs = KEY_DOUBLE_WIN_MS;
 						Dev->Phase = P_WAIT2;
 					}
@@ -155,9 +156,8 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 			{
 				Dev->WaitMs--;
 			}
-			if (Dev->WaitMs == 0)       /* 窗口内没有第二次按下: 上报单击 */
+			if (Dev->WaitMs == 0)       /* 窗口关闭, 没有第二次按下(单击已在上报过) */
 			{
-				Key_Report(Action, OneButton);
 				Dev->Phase = P_IDLE;
 			}
 			break;
