@@ -1,0 +1,18 @@
+# ===== Keil MDK 构建产物 =====
+Objects/
+Listings/
+build/
+DebugConfig/
+
+# Keil 工程窗口/调试状态（因人而异，不入库）
+*.uvguix*
+*.uvoptx
+
+# ===== EIDE / VSCode 插件本地缓存（可用插件重新下载生成）=====
+.pack/
+.cmsis/
+.clangd
+
+# ===== 系统文件 =====
+Thumbs.db
+.DS_Store
