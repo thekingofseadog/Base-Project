@@ -3,7 +3,7 @@
 
 /**
   * @brief  非阻塞按键模块(单击/双击/长按)
-  * @note   Key1 = PB1, Key2 = PB11, 均为上拉输入, 按下为低电平
+  * @note   Key1 = PB1, Key2 = PB11, 均为下拉输入, 按下为高电平
   *         由 TIM4 1ms 更新中断驱动 Key_Tick() 完成消抖与按键动作识别,
   *         全程无阻塞等待; 使用时只需周期查询 KeyAction1 / KeyAction2。
   *

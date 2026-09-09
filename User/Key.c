@@ -2,7 +2,7 @@
 #include "Key.h"
 
 /* ============================== 引脚与时基配置 ============================== */
-/* Key1 = PB1, Key2 = PB11: 上拉输入, 按下为低电平, 松开为高电平 */
+/* Key1 = PB1, Key2 = PB11: 下拉输入, 按下为高电平, 松开为低电平 */
 #define KEY1_PORT               GPIOB
 #define KEY1_PIN                GPIO_Pin_1
 #define KEY2_PORT               GPIOB
@@ -20,8 +20,8 @@
 #define KEY_LONG_MS             1000    /* 长按阈值: 按下持续 1000ms 上报一次长按 */
 
 /* ============================== 内部电平/阶段定义 ============================== */
-#define KEY_RELEASED            0x01    /* 去抖后电平: 松开(高) */
-#define KEY_PRESSED             0x00    /* 去抖后电平: 按下(低) */
+#define KEY_PRESSED             0x01    /* 去抖后电平: 按下(高) */
+#define KEY_RELEASED            0x00    /* 去抖后电平: 松开(低) */
 
 enum
 {
@@ -71,7 +71,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 	uint8_t Raw;    /* 原始电平 */
 	uint8_t Pre;    /* 消抖前的电平(用于沿检测) */
 
-	Raw = (GPIO_ReadInputDataBit(Dev->Port, Dev->Pin) == Bit_RESET) ?
+	Raw = (GPIO_ReadInputDataBit(Dev->Port, Dev->Pin) == Bit_SET) ?
 	       KEY_PRESSED : KEY_RELEASED;
 	Pre = Dev->Level;
 
@@ -181,7 +181,7 @@ void Key_Tick(void)
 
 /**
   * @brief  按键 GPIO 与 TIM4 1ms 时基初始化(按键为非阻塞方式扫描)
-  * @note   Key1 = PB1, Key2 = PB11, 上拉输入;
+  * @note   Key1 = PB1, Key2 = PB11, 下拉输入;
   *         TIM4 每 1ms 产生更新中断, 中断内自动调用 Key_Tick()
   * @retval 无
   */
@@ -196,9 +196,9 @@ void Key_Init(void)
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
 	RCC_APB1PeriphClockCmd(KEY_TIM_RCC, ENABLE);
 
-	/* 2. 按键引脚配置: PB1、PB11 上拉输入 */
+	/* 2. 按键引脚配置: PB1、PB11 下拉输入(按下接高电平) */
 	GPIO_InitStructure.GPIO_Pin = KEY1_PIN | KEY2_PIN;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPD;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
 
