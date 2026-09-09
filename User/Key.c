@@ -15,7 +15,7 @@
 /* ============================== 时序参数(单位 ms) ============================== */
 #define KEY_DEBOUNCE_MS         10      /* 消抖时间: 电平需连续稳定 10ms 才确认翻转 */
 #define KEY_DOUBLE_WIN_MS       300     /* 双击判定窗口: 短按松开后 300ms 内再按下为双击, 超时判为单击 */
-#define KEY_LONG_MS             600     /* 长按阈值: 按下持续 600ms 上报一次长按 */
+#define KEY_LONG_MS             600     /* 长按阈值: 按住达 600ms 后松开, 松开瞬间上报一次长按 */
 
 /* ============================== 内部电平/阶段定义 ============================== */
 #define KEY_PRESSED             0x01    /* 去抖后电平: 按下(高) */
@@ -26,7 +26,7 @@ enum
 	P_IDLE = 0,     /* 空闲, 等待按下 */
 	P_PRESS,        /* 按下中(计时判定长按) */
 	P_WAIT2,        /* 短按松开, 等待窗口内第二次按下(超时判为单击) */
-	P_2NDPRESS      /* 双击已判定, 等待第二次按下松开 */
+	P_2NDPRESS      /* 第二次按下中(松开瞬间上报双击) */
 };
 
 /* 单个按键的内部状态 */
@@ -37,7 +37,7 @@ typedef struct
 	uint8_t       Level;    /* 当前去抖后电平: KEY_RELEASED / KEY_PRESSED */
 	uint8_t       StableCnt;/* 电平稳定计数(消抖用, 单位节拍) */
 	uint8_t       Phase;    /* 内部阶段: P_IDLE / P_PRESS / P_WAIT2 / P_2NDPRESS */
-	uint8_t       LongDone; /* 本次按下是否已上报过长按 */
+	uint8_t       LongDone; /* 本次按下是否已达到长按阈值(松开瞬间上报长按) */
 	uint16_t      PressMs;  /* 本次按下已持续的时间(ms) */
 	uint16_t      WaitMs;   /* 双击等待窗口倒计时(ms) */
 } Key_Dev_t;
@@ -101,8 +101,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					Dev->LongDone = 0;
 					break;
 
-				case P_WAIT2:           /* 双击窗口内第二次按下: 上报双击 */
-					Key_Report(Action, TwoButton);
+				case P_WAIT2:           /* 双击窗口内第二次按下: 进入待确认(松开瞬间报双击) */
 					Dev->Phase = P_2NDPRESS;
 					break;
 
@@ -115,8 +114,9 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 			switch (Dev->Phase)
 			{
 				case P_PRESS:
-					if (Dev->LongDone)  /* 长按后的松开: 不产生单击/双击 */
+					if (Dev->LongDone)  /* 长按后松开: 松开瞬间上报长按(松开响应) */
 					{
+						Key_Report(Action, LongButton);
 						Dev->Phase = P_IDLE;
 					}
 					else                /* 短按松开: 进入双击判定窗口(无第二次按下才判单击) */
@@ -126,7 +126,8 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					}
 					break;
 
-				case P_2NDPRESS:        /* 双击的第二次松开 */
+				case P_2NDPRESS:        /* 双击的第二次松开: 松开瞬间上报双击(松开响应) */
+					Key_Report(Action, TwoButton);
 					Dev->Phase = P_IDLE;
 					break;
 
@@ -143,8 +144,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 			Dev->PressMs++;
 			if ((Dev->PressMs >= KEY_LONG_MS) && (Dev->LongDone == 0))
 			{
-				Key_Report(Action, LongButton);     /* 达到长按阈值, 只上报一次 */
-				Dev->LongDone = 1;
+				Dev->LongDone = 1;      /* 达到长按阈值: 仅做标记, 待松开瞬间上报(松开响应) */
 			}
 			break;
 
