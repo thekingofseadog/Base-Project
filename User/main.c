@@ -2,31 +2,37 @@
 #include "OLED.h"
 #include "Key.h"
 
-/* 两个按键的各动作累计计数(单击/双击/长按) */
-uint32_t Key1Single = 0, Key1Double = 0, Key1Long = 0;
-uint32_t Key2Single = 0, Key2Double = 0, Key2Long = 0;
+/* 最近一次动作值(保持显示用, 初始/无动作为 Waiting=0) */
+KeyAction_e LastAction1 = Waiting;
+KeyAction_e LastAction2 = Waiting;
+
+/* 动作值对应的名称(与枚举一一对应, 不足6字符补空格以便整行覆盖刷新) */
+static const char *ActionName[4] = {"Wait  ", "One   ", "Two   ", "Long  "};
 
 /**
-  * @brief  刷新 OLED 计数显示
-  * @note   布局: 第1行 Key1 单击/双击次数, 第2行 Key1 长按次数
-  *              第3行 Key2 单击/双击次数, 第4行 Key2 长按次数
+  * @brief  刷新 OLED: 第1行显示 KeyAction1 的值, 第2行显示 KeyAction2 的值
+  * @note   第3/4行为图例: 0=等待 1=单击 2=双击 3=长按
+  *         值 1/2/3 在动作发生后一直保持显示, 直到下一次动作才更新,
+  *         便于肉眼观察(原始状态在 Key_Clear() 后会立即回到 0)
+  * @param  Act1 : Key1 最近一次动作值
+  * @param  Act2 : Key2 最近一次动作值
   * @retval 无
   */
-static void OLED_ShowCounts(void)
+static void OLED_ShowActions(KeyAction_e Act1, KeyAction_e Act2)
 {
-	OLED_ShowString(1, 0, "K1 1:");
-	OLED_ShowNum(1, 6, Key1Single, 3);
-	OLED_ShowString(1, 9, "2:");
-	OLED_ShowNum(1, 11, Key1Double, 3);
-	OLED_ShowString(2, 0, "K1 L:");
-	OLED_ShowNum(2, 5, Key1Long, 3);
+	/* 第1行: KeyAction1 的值 */
+	OLED_ShowString(1, 0, "KeyAct1: ");                 // 占 0~8 列
+	OLED_ShowChar(1, 9, (char)('0' + Act1));            // 值 0~3
+	OLED_ShowString(1, 10, (char *)ActionName[Act1]);   // 名称
 
-	OLED_ShowString(3, 0, "K2 1:");
-	OLED_ShowNum(3, 6, Key2Single, 3);
-	OLED_ShowString(3, 9, "2:");
-	OLED_ShowNum(3, 11, Key2Double, 3);
-	OLED_ShowString(4, 0, "K2 L:");
-	OLED_ShowNum(4, 5, Key2Long, 3);
+	/* 第2行: KeyAction2 的值 */
+	OLED_ShowString(2, 0, "KeyAct2: ");
+	OLED_ShowChar(2, 9, (char)('0' + Act2));
+	OLED_ShowString(2, 10, (char *)ActionName[Act2]);
+
+	/* 第3/4行: 图例 */
+	OLED_ShowString(3, 0, "0:Wait 1:One");
+	OLED_ShowString(4, 0, "2:Two  3:Long");
 }
 
 int main(void)
@@ -36,35 +42,29 @@ int main(void)
 	OLED_Init();				// OLED 初始化(PB8/PB9 软件I2C)
 	Key_Init();					// 按键初始化(PB1=Key1, PB11=Key2, TIM4 1ms时基)
 	OLED_Clear();
-	OLED_ShowCounts();
+	OLED_ShowActions(Waiting, Waiting);
 
 	while (1)
 	{
-		/* 查询 Key1(PB1) 动作并计数 */
-		switch (KeyAction1)
+		/* 动作出现时记下 KeyAction1 / KeyAction2 的值(保持显示, 直到下次动作) */
+		if (KeyAction1 != Waiting)
 		{
-			case OneButton:    Key1Single++;  NewEvent = 1; break;
-			case TwoButton:    Key1Double++;  NewEvent = 1; break;
-			case LongButton:   Key1Long++;    NewEvent = 1; break;
-			default: break;
+			LastAction1 = KeyAction1;
+			NewEvent = 1;
+		}
+		if (KeyAction2 != Waiting)
+		{
+			LastAction2 = KeyAction2;
+			NewEvent = 1;
 		}
 
-		/* 查询 Key2(PB11) 动作并计数 */
-		switch (KeyAction2)
-		{
-			case OneButton:    Key2Single++;  NewEvent = 1; break;
-			case TwoButton:    Key2Double++;  NewEvent = 1; break;
-			case LongButton:   Key2Long++;    NewEvent = 1; break;
-			default: break;
-		}
-
-		/* 动作已处理, 统一清除(未清除前产生的新动作会被丢弃) */
+		/* 动作已记录, 统一清除(未清除前产生的新动作会被丢弃) */
 		Key_Clear();
 
 		/* 仅在出现动作时刷新 OLED, 避免频繁占用 I2C 影响按键响应 */
 		if (NewEvent)
 		{
-			OLED_ShowCounts();
+			OLED_ShowActions(LastAction1, LastAction2);
 			NewEvent = 0;
 		}
 	}
