@@ -101,8 +101,10 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					Dev->LongDone = 0;
 					break;
 
-				case P_WAIT2:           /* 双击窗口内第二次按下: 进入待确认(松开瞬间报双击) */
+				case P_WAIT2:           /* 双击窗口内第二次按下: 进入待确认(松开时按按住时长报双击/长按) */
 					Dev->Phase = P_2NDPRESS;
+					Dev->PressMs = 0;
+					Dev->LongDone = 0;      /* 第二下同样计时, 按住超长按阈值则按长按处理 */
 					break;
 
 				default:                /* P_PRESS / P_2NDPRESS 期间不会出现新的按下沿 */
@@ -126,8 +128,15 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 					}
 					break;
 
-				case P_2NDPRESS:        /* 双击的第二次松开: 松开瞬间上报双击(松开响应) */
-					Key_Report(Action, TwoButton);
+				case P_2NDPRESS:        /* 第二次松开: 按住未超阈值报双击, 超阈值报长按(松开响应) */
+					if (Dev->LongDone)
+					{
+						Key_Report(Action, LongButton);
+					}
+					else
+					{
+						Key_Report(Action, TwoButton);
+					}
 					Dev->Phase = P_IDLE;
 					break;
 
@@ -141,6 +150,7 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 	switch (Dev->Phase)
 	{
 		case P_PRESS:
+		case P_2NDPRESS:            /* 第一次按下与双击的第二下都累计按住时长 */
 			Dev->PressMs++;
 			if ((Dev->PressMs >= KEY_LONG_MS) && (Dev->LongDone == 0))
 			{
