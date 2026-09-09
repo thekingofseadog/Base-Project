@@ -35,6 +35,21 @@ static void OLED_ShowActions(KeyAction_e Act1, KeyAction_e Act2)
 	OLED_ShowString(4, 0, "2:Two  3:Long");
 }
 
+/**
+  * @brief  TIM4 更新中断服务函数
+  * @note   TIM4 由 Key_Init() 配置为每 1ms 产生一次更新中断,
+  *         本函数每 1ms 调用一次 Key_Tick() 完成按键扫描(消抖/单击/双击/长按)
+  * @retval 无
+  */
+void TIM4_IRQHandler(void)
+{
+	if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
+	{
+		TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+		Key_Tick();
+	}
+}
+
 int main(void)
 {
 	uint8_t NewEvent = 0;

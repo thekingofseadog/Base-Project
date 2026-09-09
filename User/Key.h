@@ -4,8 +4,10 @@
 /**
   * @brief  非阻塞按键模块(单击/双击/长按)
   * @note   Key1 = PB1, Key2 = PB11, 均为下拉输入, 按下为高电平
-  *         由 TIM4 1ms 更新中断驱动 Key_Tick() 完成消抖与按键动作识别,
-  *         全程无阻塞等待; 使用时只需周期查询 KeyAction1 / KeyAction2。
+  *         TIM4 由 Key_Init() 配置为每 1ms 产生更新中断, 中断服务函数
+  *         TIM4_IRQHandler 需在 main.c 中实现并每 1ms 调用一次 Key_Tick(),
+  *         由此驱动消抖与按键动作识别, 全程无阻塞等待;
+  *         使用时只需周期查询 KeyAction1 / KeyAction2。
   *
   *         动作识别规则(时间参数见 Key.c 顶部宏, 可按需修改):
   *           1. 单击: 短按松开后, 在双击窗口(300ms)内没有第二次按下才上报
@@ -30,6 +32,16 @@
   *                 Key_Clear();                    处理完毕统一清除
   *             }
   *         }
+  *
+  *         TIM4 更新中断服务函数(写在 main.c 中, 每 1ms 调 Key_Tick):
+  *         void TIM4_IRQHandler(void)
+  *         {
+  *             if (TIM_GetITStatus(TIM4, TIM_IT_Update) != RESET)
+  *             {
+  *                 TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
+  *                 Key_Tick();
+  *             }
+  *         }
   *         @endcode
   *
   *         @warning 上报动作后请尽快处理并调用 Key_Clear(); 动作尚未被清除期间
@@ -49,8 +61,8 @@ extern KeyAction_e KeyAction1;   /* Key1(PB1)  的动作状态 */
 extern KeyAction_e KeyAction2;   /* Key2(PB11) 的动作状态 */
 
 /* 函数声明 */
-void Key_Init(void);    /* 按键 GPIO 初始化 + TIM4 1ms 时基启动(中断内自动调用 Key_Tick) */
+void Key_Init(void);    /* 按键 GPIO 初始化 + TIM4 1ms 时基启动(TIM4_IRQHandler 见 main.c) */
 void Key_Clear(void);   /* 将 KeyAction1 / KeyAction2 清除为 Waiting */
-void Key_Tick(void);    /* 1ms 节拍扫描函数, 已由 TIM4 中断自动调用, 一般无需手动调用 */
+void Key_Tick(void);    /* 1ms 节拍扫描函数, 由 main.c 中 TIM4_IRQHandler 每 1ms 调用 */
 
 #endif

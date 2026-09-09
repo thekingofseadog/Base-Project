@@ -8,11 +8,11 @@
 #define KEY2_PORT               GPIOB
 #define KEY2_PIN                GPIO_Pin_11
 
-/* 按键时基: TIM4 更新中断, 每 1ms 调用一次 Key_Tick() */
+/* 按键时基: TIM4 更新中断, 每 1ms 触发一次
+   (中断服务函数 TIM4_IRQHandler 在 main.c 中实现, 内部调用 Key_Tick()) */
 #define KEY_TIM                 TIM4
 #define KEY_TIM_RCC             RCC_APB1Periph_TIM4
 #define KEY_TIM_IRQn            TIM4_IRQn
-#define KEY_TIM_IRQHandler      TIM4_IRQHandler
 
 /* ============================== 时序参数(单位 ms) ============================== */
 #define KEY_DEBOUNCE_MS         10      /* 消抖时间: 电平需连续稳定 10ms 才确认翻转 */
@@ -169,8 +169,8 @@ static void Key_Scan(Key_Dev_t *Dev, KeyAction_e *Action)
 
 /**
   * @brief  1ms 节拍扫描(两个按键)
-  * @note   已由 TIM4 更新中断自动每 1ms 调用一次, 一般无需手动调用;
-  *         若自行更换时基, 请保证按 1ms 周期调用本函数
+  * @note   需由 TIM4 更新中断服务函数(TIM4_IRQHandler, 见 main.c)
+  *         每 1ms 调用一次; 若自行更换时基, 请保证按 1ms 周期调用本函数
   * @retval 无
   */
 void Key_Tick(void)
@@ -182,7 +182,8 @@ void Key_Tick(void)
 /**
   * @brief  按键 GPIO 与 TIM4 1ms 时基初始化(按键为非阻塞方式扫描)
   * @note   Key1 = PB1, Key2 = PB11, 下拉输入;
-  *         TIM4 每 1ms 产生更新中断, 中断内自动调用 Key_Tick()
+  *         TIM4 每 1ms 产生更新中断, 中断服务函数 TIM4_IRQHandler
+  *         需在 main.c 中实现并每 1ms 调用一次 Key_Tick()
   * @retval 无
   */
 void Key_Init(void)
@@ -250,17 +251,4 @@ void Key_Clear(void)
 {
 	KeyAction1 = Waiting;
 	KeyAction2 = Waiting;
-}
-
-/**
-  * @brief  TIM4 更新中断服务函数: 每 1ms 调用一次 Key_Tick()
-  * @retval 无
-  */
-void KEY_TIM_IRQHandler(void)
-{
-	if (TIM_GetITStatus(KEY_TIM, TIM_IT_Update) != RESET)
-	{
-		TIM_ClearITPendingBit(KEY_TIM, TIM_IT_Update);
-		Key_Tick();
-	}
 }
