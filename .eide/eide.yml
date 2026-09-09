@@ -85,6 +85,10 @@ virtualFolder:
         - path: User/stm32f10x_it.h
         - path: User/Key.c
         - path: User/Key.h
+        - path: User/PWM.c
+        - path: User/PWM.h
+        - path: User/ADC.c
+        - path: User/ADC.h
       folders: []
 dependenceList: []
 outDir: build
